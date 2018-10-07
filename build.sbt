@@ -8,3 +8,5 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-dynamodb" % "1.0-M1+4-7404ed62",
   "com.typesafe.akka" %% "akka-stream-contrib" % "0.9+20-c110a2df"
 )
+
+scalafmtOnCompile := true

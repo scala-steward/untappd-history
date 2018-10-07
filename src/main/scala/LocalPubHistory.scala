@@ -29,9 +29,8 @@ import scala.collection.JavaConverters._
 object LocalPubHistory {
 
   def main(args: Array[String]): Unit = {
-    val actorConfig = ConfigFactory.parseString(
-      """
-        |akka.loglevel = INFO
+    val actorConfig = ConfigFactory.parseString("""
+                                                  |akka.loglevel = INFO
       """.stripMargin)
 
     implicit val sys = ActorSystem("LocalPubHistory", actorConfig)
@@ -41,10 +40,10 @@ object LocalPubHistory {
     implicit val dynamo: DynamoClient = DynamoClient(config.dynamo)
 
     val future = args.toList match {
-      case "current" :: Nil => storeLatest()
+      case "current" :: Nil             => storeLatest()
       case "before" :: checkinId :: Nil => storeHistoryBefore(checkinId)
-      case "scan" :: Nil => scan()
-      case _ => scala.sys.error("Unknown command")
+      case "scan" :: Nil                => scan()
+      case _                            => scala.sys.error("Unknown command")
     }
 
     future
@@ -56,7 +55,7 @@ object LocalPubHistory {
       }
       .onComplete {
         case Success(count) => println(s"Successfully processed $count results")
-        case Failure(ex) => ex.printStackTrace()
+        case Failure(ex)    => ex.printStackTrace()
       }
   }
 
@@ -65,14 +64,17 @@ object LocalPubHistory {
     queryAndStoreResults(request)
   }
 
-  private def storeHistoryBefore(checkinId: String)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
-    val uri = untappdUri(config)
+  private def storeHistoryBefore(
+      checkinId: String)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
+    val uri     = untappdUri(config)
     val request = HttpRequest(uri = uri.withQuery(uri.query().+:("max_id" -> checkinId)))
     queryAndStoreResults(request)
   }
 
-  private def queryAndStoreResults(request: HttpRequest)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) =
-    Source.single(request)
+  private def queryAndStoreResults(
+      request: HttpRequest)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) =
+    Source
+      .single(request)
       .mapAsync(parallelism = 1)(Http().singleRequest(_))
       .mapAsync(parallelism = 1)(resp => Unmarshal(resp.entity).to[String])
       .map(body => parse(body).toTry.get)
@@ -84,7 +86,8 @@ object LocalPubHistory {
           new PutItemRequest()
             .withTableName(config.tableName)
             .addItemEntry("checkin_id", new AttributeValue(checkinId.toString))
-            .addItemEntry("body", new AttributeValue(json.toString())).toOp
+            .addItemEntry("body", new AttributeValue(json.toString()))
+            .toOp
       }
       .via(DynamoDbExternal.flow[PutItem].throttle(1, 2.second, 1, ThrottleMode.shaping))
       .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
@@ -92,12 +95,13 @@ object LocalPubHistory {
 
   private def scan()(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
     import sys.dispatcher
-    ScanSource.from("638183270")
+    ScanSource
+      .from("638183270")
       .runWith(Sink.fold(0) { case (i, _) => i + 1 })
   }
 
   object ScanSource {
-    def retryCycle[A, B](flow: Flow[A, Try[B], _]) = {
+    def retryCycle[A, B](flow: Flow[A, Try[B], _]) =
       Flow.fromGraph(GraphDSL.create(flow) { implicit b => inner =>
         import GraphDSL.Implicits._
 
@@ -111,21 +115,22 @@ object LocalPubHistory {
 
         FlowShape(f.in, ???)
       })
-    }
 
-    def from(firstKey: String)(implicit mat: Materializer, ec: ExecutionContext, dynamo: DynamoClient): Source[String, NotUsed] = PagedSource(firstKey) { key =>
+    def from(firstKey: String)(implicit mat: Materializer,
+                               ec: ExecutionContext,
+                               dynamo: DynamoClient): Source[String, NotUsed] = PagedSource(firstKey) { key =>
       Source
         .single(
           new ScanRequest()
             .withTableName(config.tableName)
             //.withExclusiveStartKey(Map("checkin_id" -> new AttributeValue(key)).asJava)
-            .withAttributesToGet("checkin_id").toOp
+            .withAttributesToGet("checkin_id")
+            .toOp
         )
         .via(DynamoDbExternal.tryFlow)
         .log("Last key", _.getLastEvaluatedKey)
         .map { scanResult =>
-          val items = scanResult
-            .getItems.asScala
+          val items = scanResult.getItems.asScala
             .flatMap(_.values().asScala)
             .toList
             .map(_.toString)
@@ -139,21 +144,25 @@ object LocalPubHistory {
 
   private def untappdUri(config: Config) = {
     val query = Query(
-      "client_id" -> config.clientId,
+      "client_id"     -> config.clientId,
       "client_secret" -> config.clientSecret.value,
-      "lat" -> config.location.lat.toString,
-      "lng" -> config.location.lng.toString
+      "lat"           -> config.location.lat.toString,
+      "lng"           -> config.location.lng.toString
     )
     Uri("https://api.untappd.com/v4/thepub/local").withQuery(query)
   }
 
   object Optics {
-    val items = root.response.checkins.items.arr
+    val items     = root.response.checkins.items.arr
     val checkinId = root.checkin_id.int
   }
 
   case class Location(lat: Double, lng: Double)
-  case class Config(location: Location, clientId: String, clientSecret: Secret[String], dynamo: DynamoSettings, tableName: String)
+  case class Config(location: Location,
+                    clientId: String,
+                    clientSecret: Secret[String],
+                    dynamo: DynamoSettings,
+                    tableName: String)
 
   final val config =
     loadConfig(
@@ -167,9 +176,10 @@ object LocalPubHistory {
         clientId,
         clientSecret,
         DynamoSettings("eu-central-1", "dynamodb.eu-central-1.amazonaws.com")
-          .withCredentialsProvider(new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey.value))),
+          .withCredentialsProvider(
+            new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey.value))),
         "untappd-local-pub"
       )
-    } orThrow()
+    } orThrow ()
 
 }
