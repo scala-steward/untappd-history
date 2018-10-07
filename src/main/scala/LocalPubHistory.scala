@@ -1,15 +1,17 @@
 package lt.dvim.untappd.history
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.{ActorMaterializer, Attributes, Materializer, ThrottleMode}
-import akka.stream.alpakka.dynamodb.impl.DynamoSettings
-import akka.stream.alpakka.dynamodb.scaladsl.DynamoClient
-import akka.stream.scaladsl.{Keep, RestartFlow, Sink, Source}
+import akka.stream.alpakka.dynamodb.scaladsl.DynamoDbExternal
+import akka.stream.alpakka.dynamodb.{DynamoClient, DynamoSettings}
+import akka.stream._
+import akka.stream.contrib.PagedSource
+import akka.stream.scaladsl.{Flow, GraphDSL, Keep, MergePreferred, RestartFlow, RestartSource, Sink, Source}
 import ciris._
 import ciris.syntax._
 import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider, AWSStaticCredentialsProvider, BasicAWSCredentials}
@@ -19,8 +21,9 @@ import com.typesafe.config.ConfigFactory
 import io.circe.parser._
 import io.circe.optics.JsonPath._
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext
 import scala.collection.JavaConverters._
 
 object LocalPubHistory {
@@ -35,12 +38,12 @@ object LocalPubHistory {
     implicit val mat = ActorMaterializer()
     import sys.dispatcher
 
-    val dynamo = DynamoClient(config.dynamo)
+    implicit val dynamo: DynamoClient = DynamoClient(config.dynamo)
 
     val future = args.toList match {
-      case "current" :: Nil => storeLatest(dynamo)
-      case "before" :: checkinId :: Nil => storeHistoryBefore(checkinId, dynamo)
-      case "scan" :: Nil => scan(dynamo)
+      case "current" :: Nil => storeLatest()
+      case "before" :: checkinId :: Nil => storeHistoryBefore(checkinId)
+      case "scan" :: Nil => scan()
       case _ => scala.sys.error("Unknown command")
     }
 
@@ -57,18 +60,18 @@ object LocalPubHistory {
       }
   }
 
-  private def storeLatest(dynamo: DynamoClient)(implicit sys: ActorSystem, mat: Materializer) = {
+  private def storeLatest()(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
     val request = HttpRequest(uri = untappdUri(config))
-    queryAndStoreResults(request, dynamo)
+    queryAndStoreResults(request)
   }
 
-  private def storeHistoryBefore(checkinId: String, dynamo: DynamoClient)(implicit sys: ActorSystem, mat: Materializer) = {
+  private def storeHistoryBefore(checkinId: String)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
     val uri = untappdUri(config)
     val request = HttpRequest(uri = uri.withQuery(uri.query().+:("max_id" -> checkinId)))
-    queryAndStoreResults(request, dynamo)
+    queryAndStoreResults(request)
   }
 
-  private def queryAndStoreResults(request: HttpRequest, dynamo: DynamoClient)(implicit sys: ActorSystem, mat: Materializer) =
+  private def queryAndStoreResults(request: HttpRequest)(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) =
     Source.single(request)
       .mapAsync(parallelism = 1)(Http().singleRequest(_))
       .mapAsync(parallelism = 1)(resp => Unmarshal(resp.entity).to[String])
@@ -83,25 +86,55 @@ object LocalPubHistory {
             .addItemEntry("checkin_id", new AttributeValue(checkinId.toString))
             .addItemEntry("body", new AttributeValue(json.toString())).toOp
       }
-      .via(dynamo.flow.throttle(1, 2.second, 1, ThrottleMode.shaping))
+      .via(DynamoDbExternal.flow[PutItem].throttle(1, 2.second, 1, ThrottleMode.shaping))
       .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
       .runWith(Sink.fold(0) { case (i, q) => i + 1 })
 
-  private def scan(dynamo: DynamoClient)(implicit sys: ActorSystem, mat: Materializer) = {
-    Source
-      .single(
-        new ScanRequest()
-          .withTableName(config.tableName)
-          .withExclusiveStartKey(Map("checkin_id" -> new AttributeValue("638183270")).asJava)
-          .withAttributesToGet("checkin_id").toOp
-      )
-      .via(dynamo.flow)
-      .log("Last key", _.getLastEvaluatedKey)
-      .also
-      .mapConcat(_.getItems.asScala.flatMap(_.values().asScala).toList)
-      .log("Checkin")
-      .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
-      .runWith(Sink.fold(0) { case (i, q) => i + 1 })
+  private def scan()(implicit sys: ActorSystem, mat: Materializer, dynamo: DynamoClient) = {
+    import sys.dispatcher
+    ScanSource.from("638183270")
+      .runWith(Sink.fold(0) { case (i, _) => i + 1 })
+  }
+
+  object ScanSource {
+    def retryCycle[A, B](flow: Flow[A, Try[B], _]) = {
+      Flow.fromGraph(GraphDSL.create(flow) { implicit b => inner =>
+        import GraphDSL.Implicits._
+
+        val mergeRetries = b.add(MergePreferred[A](1))
+
+        mergeRetries.in(0) ~> flow
+
+        val f = b.add(Flow[A])
+
+        f.in ~> flow ~>
+
+        FlowShape(f.in, ???)
+      })
+    }
+
+    def from(firstKey: String)(implicit mat: Materializer, ec: ExecutionContext, dynamo: DynamoClient): Source[String, NotUsed] = PagedSource(firstKey) { key =>
+      Source
+        .single(
+          new ScanRequest()
+            .withTableName(config.tableName)
+            //.withExclusiveStartKey(Map("checkin_id" -> new AttributeValue(key)).asJava)
+            .withAttributesToGet("checkin_id").toOp
+        )
+        .via(DynamoDbExternal.tryFlow)
+        .log("Last key", _.getLastEvaluatedKey)
+        .map { scanResult =>
+          val items = scanResult
+            .getItems.asScala
+            .flatMap(_.values().asScala)
+            .toList
+            .map(_.toString)
+          val lastKey = Option(scanResult.getLastEvaluatedKey).map(_.toString)
+          PagedSource.Page(items, lastKey)
+        }
+        .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
+        .runWith(Sink.head)
+    }
   }
 
   private def untappdUri(config: Config) = {
@@ -133,13 +166,8 @@ object LocalPubHistory {
         Location(54.688567, 25.275775), // Vilnius
         clientId,
         clientSecret,
-        new DynamoSettings(
-          "eu-central-1",
-          "dynamodb.eu-central-1.amazonaws.com",
-          443,
-          1,
-          new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey.value))
-        ),
+        DynamoSettings("eu-central-1", "dynamodb.eu-central-1.amazonaws.com")
+          .withCredentialsProvider(new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey.value))),
         "untappd-local-pub"
       )
     } orThrow()
