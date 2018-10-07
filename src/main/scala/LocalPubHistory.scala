@@ -101,21 +101,6 @@ object LocalPubHistory {
   }
 
   object ScanSource {
-    def retryCycle[A, B](flow: Flow[A, Try[B], _]) =
-      Flow.fromGraph(GraphDSL.create(flow) { implicit b => inner =>
-        import GraphDSL.Implicits._
-
-        val mergeRetries = b.add(MergePreferred[A](1))
-
-        mergeRetries.in(0) ~> flow
-
-        val f = b.add(Flow[A])
-
-        f.in ~> flow ~>
-
-        FlowShape(f.in, ???)
-      })
-
     def from(firstKey: String)(implicit mat: Materializer,
                                ec: ExecutionContext,
                                dynamo: DynamoClient): Source[String, NotUsed] = PagedSource(firstKey) { key =>
@@ -128,13 +113,13 @@ object LocalPubHistory {
             .toOp
         )
         .via(DynamoDbExternal.tryFlow)
-        .log("Last key", _.getLastEvaluatedKey)
+        .log("Last key", _.get.getLastEvaluatedKey)
         .map { scanResult =>
-          val items = scanResult.getItems.asScala
+          val items = scanResult.get.getItems.asScala
             .flatMap(_.values().asScala)
             .toList
             .map(_.toString)
-          val lastKey = Option(scanResult.getLastEvaluatedKey).map(_.toString)
+          val lastKey = Option(scanResult.get.getLastEvaluatedKey).map(_.toString)
           PagedSource.Page(items, lastKey)
         }
         .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
