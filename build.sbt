@@ -22,4 +22,5 @@ scalafmtOnCompile := true
 
 version in ThisBuild ~= (_.replace('+', '-'))
 dockerUsername := Some("martynas")
+dockerExposedVolumes += "/data"
 enablePlugins(JavaAppPackaging)
