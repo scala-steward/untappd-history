@@ -1,5 +1,5 @@
 organization := "lt.dvim.untappd"
-name := "history"
+name := "untappd-history"
 
 scalaVersion := "2.12.8"
 
@@ -19,3 +19,7 @@ libraryDependencies ++= Seq(
 )
 
 scalafmtOnCompile := true
+
+version in ThisBuild ~= (_.replace('+', '-'))
+dockerUsername := Some("martynas")
+enablePlugins(JavaAppPackaging)
