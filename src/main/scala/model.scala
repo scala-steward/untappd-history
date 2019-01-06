@@ -3,7 +3,7 @@ package lt.dvim.untappd.history
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter
 
-import io.circe.Decoder
+import io.circe.{Decoder, Encoder}
 import io.circe.java8.time.decodeZonedDateTimeWithFormatter
 import lt.dvim.untappd.history.Model.CheckIn
 
@@ -23,5 +23,8 @@ object Codec {
 
   implicit val decodeCheckIn: Decoder[CheckIn] =
     Decoder.forProduct2("checkin_id", "created_at")(CheckIn.apply)
+
+  implicit val encodeStats: Encoder[DailyCheckins.Stats] =
+    Encoder.forProduct1("stats")(_.dailyCheckins)
 
 }

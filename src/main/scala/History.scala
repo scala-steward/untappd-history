@@ -11,6 +11,8 @@ import io.circe.Json
 import lt.dvim.untappd.history.LocalPubHistory.config
 import org.slf4j.LoggerFactory
 
+import scala.util.{Failure, Success}
+
 object History {
 
   sealed trait Command
@@ -56,10 +58,15 @@ object History {
             }
           }
           case StartStream =>
-            Effect.none.thenRun { state =>
-              log.debug("Starting checkin stream from checkin_id={}", state.lastCheckin)
-              implicit val untyped = ctx.system.toUntyped
-              LocalPubHistory.storeHistoryBefore(state.lastCheckin, ctx.self)
+            Effect.none.thenRun {
+              state =>
+                log.debug("Starting checkin stream from checkin_id={}", state.lastCheckin)
+                implicit val untyped = ctx.system.toUntyped
+                implicit val ec = ctx.system.executionContext
+                LocalPubHistory.storeHistoryBefore(state.lastCheckin, ctx.self).onComplete {
+                  case Success(records) => log.debug("Checkin stream completed fetching {} records", records)
+                  case Failure(ex) => log.error("Checking stream failed with the following error: {}", ex.toString)
+                }
             }
         },
         eventHandler = {

@@ -2,7 +2,7 @@ package lt.dvim.untappd.history
 
 import java.time.format.DateTimeFormatter
 
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
 
 object DailyCheckins {
 
-  trait Message
+  sealed trait Message
 
   case class StartStream(from: Long) extends Message
   object StartStream {
@@ -27,6 +27,10 @@ object DailyCheckins {
   case object FailStream extends Message
 
   case class CheckinEvent(seqNr: Long, checkIn: CheckinStored) extends Message
+
+  case class GetStats(replyTo: ActorRef[Stats]) extends Message
+
+  case class Stats(dailyCheckins: Map[String, Int])
 
   case class State(lastSeqNr: Long, dailyCheckins: Map[String, Int])
   object State {
@@ -76,6 +80,10 @@ object DailyCheckins {
               internalBehavior(state.copy(dailyCheckins = state.dailyCheckins.updated(localDate, dayCheckins)))
             }
           )
+
+        case GetStats(replyTo) =>
+          replyTo ! Stats(state.dailyCheckins)
+          Behaviors.same
       }
 
     val state = State.Initial
