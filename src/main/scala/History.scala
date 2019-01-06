@@ -6,7 +6,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 import akka.persistence.typed.scaladsl.EventSourcedBehavior.CommandHandler
-import akka.stream.typed.scaladsl.ActorMaterializer
+import akka.stream.ActorMaterializer
 import io.circe.Json
 import lt.dvim.untappd.history.LocalPubHistory.config
 import org.slf4j.LoggerFactory
@@ -29,14 +29,14 @@ object History {
 
   case class State(lastCheckin: Option[Int])
 
+  final val History = "history"
+
   private final val log = LoggerFactory.getLogger(getClass)
 
-  val behavior: Behavior[Command] =
+  def behavior(implicit mat: ActorMaterializer): Behavior[Command] =
     Behaviors.setup { implicit ctx =>
-      implicit val mat = ActorMaterializer()(ctx.system)
-
       EventSourcedBehavior[Command, Event, State](
-        persistenceId = PersistenceId("history"),
+        persistenceId = PersistenceId(History),
         emptyState = State(None),
         commandHandler = CommandHandler.command {
           case StoreCheckin(id, data) =>

@@ -10,6 +10,7 @@ libraryDependencies ++= Seq(
   "is.cir" %% "ciris-core" % "0.12.1",
   "io.circe" %% "circe-optics" % Circe,
   "io.circe" %% "circe-parser" % Circe,
+  "io.circe" %% "circe-java8" % Circe,
   "com.typesafe.akka" %% "akka-http" % "10.1.6",
   "com.typesafe.akka" %% "akka-stream-typed" % Akka,
   "com.typesafe.akka" %% "akka-persistence-typed" % Akka,

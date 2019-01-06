@@ -1,8 +1,10 @@
 package lt.dvim.untappd.history
 
+import akka.NotUsed
 import akka.actor.typed
 import akka.actor.typed._
 import akka.actor.ActorSystem
+import akka.actor.typed.scaladsl.Behaviors
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
@@ -25,12 +27,19 @@ object LocalPubHistory {
     implicit val ec = ExecutionContext.global
     val termination = for {
       _ <- Schema.createSchemaIfNotExists()
-      sys = typed.ActorSystem(History.behavior, "untappd-local-history")
+      sys = typed.ActorSystem(mainActor, "untappd-history")
       _ <- sys.whenTerminated
     } yield ()
 
     Await.ready(termination, Duration.Inf)
     ()
+  }
+
+  val mainActor: Behavior[NotUsed] = Behaviors.setup { ctx =>
+    implicit val mat = ActorMaterializer()(ctx.system)
+    ctx.spawn(History.behavior, "history")
+    ctx.spawn(DailyCheckins.behavior, "daily-checkins")
+    Behaviors.empty
   }
 
   def storeHistoryBefore(checkinId: Option[Int], target: ActorRef[History.Command])(implicit sys: ActorSystem,
