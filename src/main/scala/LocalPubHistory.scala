@@ -116,7 +116,7 @@ object LocalPubHistory {
                     httpInterface: String,
                     httpPort: Int)
 
-  import Hocon._
+  import lt.dvim.ciris.Hocon._
   final val config = {
     val hocon = hoconAt("untappd.history")
     loadConfig(
