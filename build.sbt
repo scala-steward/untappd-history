@@ -1,5 +1,6 @@
 organization := "lt.dvim.untappd"
 name := "untappd-history"
+description := "History and statistics of Untappd checkins"
 
 scalaVersion := "2.12.8"
 
@@ -9,7 +10,7 @@ val Circe = "0.11.1"
 libraryDependencies ++= Seq(
   "is.cir" %% "ciris-core" % "0.12.1",
   "lt.dvim.ciris-hocon" %% "ciris-hocon" % "0.1",
-  "io.circe" %% "circe-optics" % Circe,
+  "io.circe" %% "circe-optics" % "0.11.0",
   "io.circe" %% "circe-parser" % Circe,
   "io.circe" %% "circe-java8" % Circe,
   "com.typesafe.akka" %% "akka-http" % "10.1.7",
