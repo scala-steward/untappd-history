@@ -13,6 +13,8 @@ import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.http.scaladsl.server.Directives._
+import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
+import akka.persistence.query.PersistenceQuery
 import akka.stream.Attributes
 import akka.stream.typed.scaladsl.{ActorMaterializer, ActorSink}
 import akka.stream.scaladsl.{Sink, Source}
@@ -21,7 +23,7 @@ import ciris._
 import io.circe.parser._
 import io.circe.optics.JsonPath._
 import lt.dvim.untappd.history.DailyCheckins.GetStats
-import lt.dvim.untappd.history.History.StoreCheckin
+import lt.dvim.untappd.history.History.{CheckinStored, StoreCheckin}
 import lt.dvim.untappd.history.Codec._
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -44,10 +46,30 @@ object LocalPubHistory {
   val mainActor: Behavior[NotUsed] = Behaviors.setup { ctx =>
     implicit val untyped = ctx.system.toUntyped
     implicit val mat = ActorMaterializer()(ctx.system)
-    ctx.spawn(History.behavior, "history")
-    val dailyCheckins = ctx.spawn(DailyCheckins.behavior, "daily-checkins")
 
-    Http().bindAndHandle(routes(dailyCheckins.narrow), config.httpInterface, config.httpPort)
+    if (config.migration) {
+      ctx.log.debug("Running migration")
+
+      val migrator = ctx.spawn(Migrator.behavior(), "migrator")
+      ctx.watch(migrator)
+
+      PersistenceQuery(ctx.system.toUntyped)
+        .readJournalFor[JdbcReadJournal](JdbcReadJournal.Identifier)
+        .currentEventsByPersistenceId(History.History, 0, Long.MaxValue)
+        .collect {
+          case env =>
+            env.event match {
+              case e: CheckinStored => Migrator.StoreEvent(e)
+            }
+        }
+        .runWith(ActorSink.actorRef(migrator, Migrator.CompleteStream, Migrator.FailStream.apply))
+
+    } else {
+      ctx.spawn(History.behavior, "history")
+      val dailyCheckins = ctx.spawn(DailyCheckins.behavior, "daily-checkins")
+
+      Http().bindAndHandle(routes(dailyCheckins.narrow), config.httpInterface, config.httpPort)
+    }
 
     Behaviors.receiveSignal {
       case (_, Terminated(_)) ⇒
@@ -114,7 +136,8 @@ object LocalPubHistory {
                     clientSecret: Secret[String],
                     streamBackoff: FiniteDuration,
                     httpInterface: String,
-                    httpPort: Int)
+                    httpPort: Int,
+                    migration: Boolean)
 
   import lt.dvim.ciris.Hocon._
   final val config = {
@@ -124,15 +147,17 @@ object LocalPubHistory {
       hocon[Secret[String]]("client-secret"),
       hocon[FiniteDuration]("stream-backoff"),
       hocon[String]("http.interface"),
-      hocon[Int]("http.port")
-    ) { (clientId, clientSecret, streamBackoff, interface, port) =>
+      hocon[Int]("http.port"),
+      hocon[Boolean]("migration")
+    ) { (clientId, clientSecret, streamBackoff, interface, port, migration) =>
       Config(
         Location(54.688567, 25.275775), // Vilnius
         clientId,
         clientSecret,
         streamBackoff,
         interface,
-        port
+        port,
+        migration
       )
     }.orThrow()
   }

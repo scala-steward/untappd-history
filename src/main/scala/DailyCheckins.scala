@@ -9,8 +9,10 @@ import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import akka.persistence.query.PersistenceQuery
 import akka.stream.typed.scaladsl.{ActorMaterializer, ActorSink}
 import lt.dvim.untappd.history.Codec._
-import lt.dvim.untappd.history.History.CheckinStored
+import lt.dvim.untappd.history.History.{CheckinStored, Event}
 import lt.dvim.untappd.history.Model.CheckIn
+import lt.dvim.untappd.history.Serialization._
+import io.circe.generic.auto._
 import org.slf4j.LoggerFactory
 
 object DailyCheckins {
@@ -24,7 +26,7 @@ object DailyCheckins {
 
   case object CompleteStream extends Message
 
-  case object FailStream extends Message
+  case class FailStream(ex: Throwable) extends Message
 
   case class CheckinEvent(seqNr: Long, checkIn: CheckinStored) extends Message
 
@@ -46,14 +48,12 @@ object DailyCheckins {
           log.debug("DailyCheckin Query stream starting")
           PersistenceQuery(ctx.system.toUntyped)
             .readJournalFor[JdbcReadJournal](JdbcReadJournal.Identifier)
-            .eventsByPersistenceId(History.History, from, Long.MaxValue)
+            .eventsByPersistenceId(History.HistoryJson, from, Long.MaxValue)
+            .map(envelope => envelope -> decodeBytes[Event](envelope.event))
             .collect {
-              case env =>
-                env.event match {
-                  case e: CheckinStored => CheckinEvent(env.sequenceNr, e)
-                }
+              case (env, Right(e: CheckinStored)) => CheckinEvent(env.sequenceNr, e)
             }
-            .runWith(ActorSink.actorRef(ctx.self, CompleteStream, _ => FailStream))
+            .runWith(ActorSink.actorRef(ctx.self, CompleteStream, FailStream.apply))
           Behaviors.same
 
         case CompleteStream =>
@@ -61,14 +61,16 @@ object DailyCheckins {
           ctx.self ! StartStream(state.lastSeqNr)
           Behaviors.same
 
-        case FailStream =>
-          log.debug("DailyCheckin Query stream failed")
+        case FailStream(ex) =>
+          log.error("DailyCheckin Query stream failed", ex)
           ctx.self ! StartStream(state.lastSeqNr)
           Behaviors.same
 
         case CheckinEvent(seqNr, CheckinStored(id, data)) =>
           val checkIn = data.as[CheckIn]
-          log.debug("{} current daily checkins {}", seqNr, state.dailyCheckins)
+          if (seqNr % 1000 == 0) {
+            log.debug("{} current daily checkins {}", seqNr, state.dailyCheckins)
+          }
           checkIn.fold(
             failure => {
               log.error("Unable to decode stored checkin with id [{}]", id, failure)

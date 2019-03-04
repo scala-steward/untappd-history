@@ -12,6 +12,7 @@ libraryDependencies ++= Seq(
   "lt.dvim.ciris-hocon" %% "ciris-hocon" % "0.1",
   "io.circe" %% "circe-optics" % "0.11.0",
   "io.circe" %% "circe-parser" % Circe,
+  "io.circe" %% "circe-generic" % Circe,
   "io.circe" %% "circe-java8" % Circe,
   "com.typesafe.akka" %% "akka-http" % "10.1.7",
   "de.heikoseeberger" %% "akka-http-circe" % "1.24.3",

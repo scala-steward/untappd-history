@@ -6,6 +6,7 @@
     </appender>
 
     <logger name="akka" level="WARN"/>
+    <logger name="akka.serialization" level="DEBUG"/>
     <logger name="slick" level="WARN"/>
     <logger name="com.zaxxer.hikari" level="WARN"/>
     <logger name="lt.dvim" level="DEBUG"/>

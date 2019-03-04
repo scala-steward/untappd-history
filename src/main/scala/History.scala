@@ -1,5 +1,7 @@
 package lt.dvim.untappd.history
 
+import java.nio.charset.StandardCharsets
+
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.Behaviors
@@ -8,7 +10,9 @@ import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 import akka.persistence.typed.scaladsl.EventSourcedBehavior.CommandHandler
 import akka.stream.ActorMaterializer
 import io.circe.Json
+import io.circe.generic.auto._
 import lt.dvim.untappd.history.LocalPubHistory.config
+import lt.dvim.untappd.history.Serialization._
 import org.slf4j.LoggerFactory
 
 import scala.util.{Failure, Success}
@@ -32,17 +36,18 @@ object History {
   case class State(lastCheckin: Option[Int])
 
   final val History = "history"
+  final val HistoryJson = "history-json"
 
   private final val log = LoggerFactory.getLogger(getClass)
 
   def behavior(implicit mat: ActorMaterializer): Behavior[Command] =
     Behaviors.setup { implicit ctx =>
-      EventSourcedBehavior[Command, Event, State](
-        persistenceId = PersistenceId(History),
+      EventSourcedBehavior[Command, Array[Byte], State](
+        persistenceId = PersistenceId(HistoryJson),
         emptyState = State(None),
         commandHandler = CommandHandler.command {
           case StoreCheckin(id, data) =>
-            Effect.persist(CheckinStored(id, data)).thenRun { _ =>
+            Effect.persist(CheckinStored(id, data).asInstanceOf[Event].asBytes).thenRun { _ =>
               log.debug("Persisted checkin_id={}", id)
             }
           case CompleteStream =>
@@ -70,10 +75,17 @@ object History {
             }
         },
         eventHandler = {
-          case (state, CheckinStored(id, _)) =>
-            state.copy(lastCheckin = Some(Seq(id, state.lastCheckin.getOrElse(0)).max))
+          case (state, eventBytes) =>
+            decodeBytes[Event](eventBytes) match {
+              case Right(CheckinStored(id, _)) =>
+                state.copy(lastCheckin = Some(Seq(id, state.lastCheckin.getOrElse(0)).max))
+              case Left(ex) =>
+                log.error(s"Unable to decode event: [${new String(eventBytes, StandardCharsets.UTF_8)}]", ex)
+                state
+            }
         }
-      ).onRecoveryCompleted { _ ⇒
+      ).onRecoveryCompleted { state ⇒
+        log.debug(s"Recovery completed. Last stored checkin: [${state.lastCheckin}]")
         ctx.scheduleOnce(config.streamBackoff, ctx.self, StartStream)
         ()
       }
