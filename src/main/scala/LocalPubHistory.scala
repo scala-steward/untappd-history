@@ -143,8 +143,14 @@ object LocalPubHistory {
   final val config = {
     val hocon = hoconAt("untappd.history")
     loadConfig(
-      hocon[String]("client-id"),
-      hocon[Secret[String]]("client-secret"),
+      hocon[String]("client-id").flatMapValue {
+        case path if path.contains("/") => file[String](new java.io.File(path)).value
+        case id => Right(id)
+      },
+      hocon[Secret[String]]("client-secret").flatMapValue {
+        case Secret(path) if path.contains("/") => file[Secret[String]](new java.io.File(path)).value
+        case secret => Right(secret)
+      },
       hocon[FiniteDuration]("stream-backoff"),
       hocon[String]("http.interface"),
       hocon[Int]("http.port"),
