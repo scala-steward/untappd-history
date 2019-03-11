@@ -17,8 +17,8 @@ import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
 import akka.persistence.query.PersistenceQuery
 import akka.stream.Attributes
 import akka.stream.typed.scaladsl.{ActorMaterializer, ActorSink}
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.util.{ByteString, Timeout}
 import ciris._
 import io.circe.parser._
 import io.circe.optics.JsonPath._
@@ -65,10 +65,10 @@ object LocalPubHistory {
         .runWith(ActorSink.actorRef(migrator, Migrator.CompleteStream, Migrator.FailStream.apply))
 
     } else {
-      ctx.spawn(History.behavior, "history")
+      val history = ctx.spawn(History.behavior, "history")
       val dailyCheckins = ctx.spawn(DailyCheckins.behavior, "daily-checkins")
 
-      Http().bindAndHandle(routes(dailyCheckins.narrow), config.httpInterface, config.httpPort)
+      Http().bindAndHandle(routes(dailyCheckins.narrow, history), config.httpInterface, config.httpPort)
     }
 
     Behaviors.receiveSignal {
@@ -77,7 +77,7 @@ object LocalPubHistory {
     }
   }
 
-  def routes(dailyCheckins: ActorRef[DailyCheckins.GetStats]) =
+  def routes(dailyCheckins: ActorRef[DailyCheckins.GetStats], history: ActorRef[History.Command]) =
     extractActorSystem { sys =>
       implicit val timeout: Timeout = 3.seconds
       implicit val scheduler = sys.scheduler
@@ -87,29 +87,48 @@ object LocalPubHistory {
           val checkins: Future[DailyCheckins.Stats] = dailyCheckins ? GetStats
           complete(checkins)
         }
+      } ~ path("ingestion") {
+        if (config.ingestion) {
+          extractMaterializer { implicit mat =>
+            import sys.dispatcher
+            formField('min_id.as[Int]) { minId =>
+              fileUpload("data") {
+                case (_, byteSource) =>
+                  val req = byteSource.runWith(Sink.fold(ByteString.empty)(_ ++ _)).map(_.utf8String)
+                  val stored = Source
+                    .fromFuture(req)
+                    .runWith(parseAndStoreResults(history, minId))
+                  complete(stored.map(r => s"Stored $r results"))
+              }
+            }
+          }
+        } else {
+          complete("Ingestion disabled")
+        }
       }
     }
 
-  def storeHistoryBefore(checkinId: Option[Int], target: ActorRef[History.Command])(implicit sys: ActorSystem,
-                                                                                    mat: ActorMaterializer) = {
-    val request = HttpRequest(uri = untappdUri(config, checkinId))
-    queryAndStoreResults(request, target)
-  }
-
-  private def queryAndStoreResults(request: HttpRequest, target: ActorRef[History.Command])(implicit sys: ActorSystem,
-                                                                                            mat: ActorMaterializer) =
+  def storeHistoryBefore(
+      checkinId: Option[Int],
+      target: ActorRef[History.Command]
+  )(implicit sys: ActorSystem, mat: ActorMaterializer): Future[Int] =
     Source
-      .single(request)
+      .single(HttpRequest(uri = untappdUri(config, checkinId)))
       .mapAsync(parallelism = 1)(Http().singleRequest(_))
       .mapAsync(parallelism = 1)(resp => Unmarshal(resp.entity).to[String])
+      .runWith(parseAndStoreResults(target, 0))
+
+  private def parseAndStoreResults(target: ActorRef[History.Command], minId: Int) =
+    Flow[String]
       .map(body => parse(body).toTry.get)
       .mapConcat(Optics.items.getOption(_).toList.flatten)
       .map(json => (Optics.checkinId.getOption(json).get, json))
       .map(StoreCheckin.tupled)
+      .takeWhile(_.id > minId)
       .log("Single checkin", _.id)
       .alsoTo(ActorSink.actorRef(target, History.CompleteStream, _ => History.FailStream))
       .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
-      .runWith(Sink.fold(0) { case (i, _) => i + 1 })
+      .toMat(Sink.fold(0) { case (i, _) => i + 1 })(Keep.right)
 
   private def untappdUri(config: Config, fromCheckin: Option[Int]): Uri = {
     val query = Query(
@@ -137,7 +156,8 @@ object LocalPubHistory {
                     streamBackoff: FiniteDuration,
                     httpInterface: String,
                     httpPort: Int,
-                    migration: Boolean)
+                    migration: Boolean,
+                    ingestion: Boolean)
 
   import lt.dvim.ciris.Hocon._
   final val config = {
@@ -154,8 +174,9 @@ object LocalPubHistory {
       hocon[FiniteDuration]("stream-backoff"),
       hocon[String]("http.interface"),
       hocon[Int]("http.port"),
-      hocon[Boolean]("migration")
-    ) { (clientId, clientSecret, streamBackoff, interface, port, migration) =>
+      hocon[Boolean]("migration"),
+      hocon[Boolean]("ingestion")
+    ) { (clientId, clientSecret, streamBackoff, interface, port, migration, ingestion) =>
       Config(
         Location(54.688567, 25.275775), // Vilnius
         clientId,
@@ -163,7 +184,8 @@ object LocalPubHistory {
         streamBackoff,
         interface,
         port,
-        migration
+        migration,
+        ingestion
       )
     }.orThrow()
   }
