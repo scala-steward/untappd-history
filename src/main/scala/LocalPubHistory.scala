@@ -18,7 +18,7 @@ import akka.persistence.query.PersistenceQuery
 import akka.stream.Attributes
 import akka.stream.typed.scaladsl.{ActorMaterializer, ActorSink}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import ciris._
 import io.circe.parser._
 import io.circe.optics.JsonPath._
@@ -91,15 +91,11 @@ object LocalPubHistory {
         if (config.ingestion) {
           extractMaterializer { implicit mat =>
             import sys.dispatcher
-            formField('min_id.as[Int]) { minId =>
-              fileUpload("data") {
-                case (_, byteSource) =>
-                  val req = byteSource.runWith(Sink.fold(ByteString.empty)(_ ++ _)).map(_.utf8String)
-                  val stored = Source
-                    .fromFuture(req)
-                    .runWith(parseAndStoreResults(history, minId))
-                  complete(stored.map(r => s"Stored $r results"))
-              }
+            formFields(('min_id.as[Int], 'data.as[String])) { (minId, data) =>
+              val stored = Source
+                .single(data)
+                .runWith(parseAndStoreResults(history, minId))
+              complete(stored.map(r => s"Stored $r results"))
             }
           }
         } else {
