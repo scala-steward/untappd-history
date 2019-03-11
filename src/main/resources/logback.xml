@@ -5,13 +5,25 @@
         </encoder>
     </appender>
 
-    <logger name="akka" level="WARN"/>
+    <logger name="akka" level="INFO"/>
     <logger name="akka.serialization" level="DEBUG"/>
     <logger name="slick" level="WARN"/>
     <logger name="com.zaxxer.hikari" level="WARN"/>
+    <logger name="io.grpc.netty" level="WARN"/>
     <logger name="lt.dvim" level="DEBUG"/>
 
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </root>
+
+    <if condition='System.getenv("GOOGLE_APPLICATION_CREDENTIALS") != null'>
+        <then>
+            <appender name="CLOUD" class="com.google.cloud.logging.logback.LoggingAppender">
+                <flushLevel>DEBUG</flushLevel>
+            </appender>
+            <root>
+                <appender-ref ref="CLOUD"/>
+            </root>
+        </then>
+    </if>
 </configuration>

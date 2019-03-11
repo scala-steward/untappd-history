@@ -4,7 +4,7 @@ description := "History and statistics of Untappd checkins"
 
 scalaVersion := "2.12.8"
 
-val Akka = "2.5.19"
+val Akka = "2.5.21"
 val Circe = "0.11.1"
 
 libraryDependencies ++= Seq(
@@ -21,6 +21,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-persistence-query" % Akka,
   "com.typesafe.akka" %% "akka-slf4j" % Akka,
   "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "com.google.cloud" % "google-cloud-logging-logback" % "0.82.0-alpha",
+  "org.codehaus.janino" % "janino" % "3.0.12",
   "com.github.dnvriend" %% "akka-persistence-jdbc" % "3.4.0",
   "com.h2database" % "h2" % "1.4.197"
 )
