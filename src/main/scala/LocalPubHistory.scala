@@ -10,8 +10,6 @@ import ciris._
 import io.circe.parser._
 import io.circe.optics.JsonPath._
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import akka.NotUsed
 import io.circe.Json
 import com.google.cloud.firestore.FirestoreOptions
@@ -22,9 +20,9 @@ import scala.concurrent.Promise
 import com.google.cloud.firestore.WriteResult
 import com.google.api.core.ApiFutureCallback
 import scala.concurrent.Future
-import akka.event.slf4j.Logger
 import scala.concurrent.ExecutionContextExecutor
 import akka.stream.Attributes
+import akka.http.scaladsl.server.Directives._
 
 object LocalPubHistory {
 
@@ -39,7 +37,20 @@ object LocalPubHistory {
     implicit val sys = ActorSystem("untappd")
     import sys.dispatcher
 
-    val result = checkinStream()
+    Http().bindAndHandle(routes(), config.httpInterface, config.httpPort)
+    ()
+  }
+
+  def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
+    path("checkins") {
+      get {
+        val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
+        complete(stored)
+      }
+    }
+
+  def storeCheckins()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
+    checkinStream()
       .mapAsync(parallelism = 1)((storeCheckin _).tupled)
       .log("Checking stored")
       .withAttributes(
@@ -49,17 +60,6 @@ object LocalPubHistory {
         )
       )
       .runFold(0)((count, _) => count + 1)
-
-    val completion = for {
-      count <- result
-      _ <- Http().shutdownAllConnectionPools()
-      _ <- sys.terminate()
-    } yield {
-      Logger(LocalPubHistory.getClass, "main").info(s"Successfully stored [$count] checkins.")
-    }
-
-    Await.result(completion, Duration.Inf)
-  }
 
   def checkinStream()(implicit sys: ActorSystem): Source[(Int, Json), NotUsed] =
     Source
@@ -107,7 +107,9 @@ object LocalPubHistory {
       location: Location,
       clientId: String,
       clientSecret: Secret[String],
-      projectId: String = "untappd-263504"
+      projectId: String,
+      httpInterface: String,
+      httpPort: Int
   )
 
   import lt.dvim.ciris.Hocon._
@@ -121,12 +123,17 @@ object LocalPubHistory {
       hocon[Secret[String]]("client-secret").flatMapValue {
         case Secret(path) if path.contains("/") => file[Secret[String]](new java.io.File(path)).value
         case secret => Right(secret)
-      }
-    ) { (clientId, clientSecret) =>
+      },
+      hocon[String]("http.interface"),
+      hocon[Int]("http.port")
+    ) { (clientId, clientSecret, interface, port) =>
       Config(
         Location(54.688567, 25.275775), // Vilnius
         clientId,
-        clientSecret
+        clientSecret,
+        "untappd-263504",
+        interface,
+        port
       )
     }.orThrow()
   }
