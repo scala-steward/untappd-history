@@ -1,28 +1,28 @@
 package lt.dvim.untappd.history
 
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.Future
+import scala.concurrent.Promise
+import scala.jdk.CollectionConverters._
+
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.Attributes
 import akka.stream.scaladsl.Source
 import ciris._
-import io.circe.parser._
-import io.circe.optics.JsonPath._
-
-import akka.NotUsed
-import io.circe.Json
-import com.google.cloud.firestore.FirestoreOptions
-import com.google.cloud.firestore.Firestore
-import scala.jdk.CollectionConverters._
-import com.google.api.core.ApiFutures
-import scala.concurrent.Promise
-import com.google.cloud.firestore.WriteResult
 import com.google.api.core.ApiFutureCallback
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContextExecutor
-import akka.stream.Attributes
-import akka.http.scaladsl.server.Directives._
+import com.google.api.core.ApiFutures
+import com.google.cloud.firestore.Firestore
+import com.google.cloud.firestore.FirestoreOptions
+import com.google.cloud.firestore.WriteResult
+import io.circe.Json
+import io.circe.optics.JsonPath._
+import io.circe.parser._
 
 object LocalPubHistory {
 

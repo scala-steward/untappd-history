@@ -8,17 +8,17 @@ val Akka = "2.6.1"
 val Circe = "0.12.3"
 
 libraryDependencies ++= Seq(
-  "is.cir" %% "ciris-core" % "0.13.0-RC1",
-  "lt.dvim.ciris-hocon" %% "ciris-hocon" % "0.2",
-  "io.circe" %% "circe-optics" % "0.12.0",
-  "io.circe" %% "circe-parser" % Circe,
-  "io.circe" %% "circe-generic" % Circe,
-  "com.typesafe.akka" %% "akka-stream" % Akka,
-  "com.typesafe.akka" %% "akka-slf4j" % Akka,
-  "com.typesafe.akka" %% "akka-http" % "10.1.11",
-  "de.heikoseeberger" %% "akka-http-circe" % "1.30.0",
-  "ch.qos.logback" % "logback-classic" % "1.2.3",
-  "com.google.cloud" % "google-cloud-firestore" % "1.32.0",
+  "is.cir"              %% "ciris-core"            % "0.13.0-RC1",
+  "lt.dvim.ciris-hocon" %% "ciris-hocon"           % "0.2",
+  "io.circe"            %% "circe-optics"          % "0.12.0",
+  "io.circe"            %% "circe-parser"          % Circe,
+  "io.circe"            %% "circe-generic"         % Circe,
+  "com.typesafe.akka"   %% "akka-stream"           % Akka,
+  "com.typesafe.akka"   %% "akka-slf4j"            % Akka,
+  "com.typesafe.akka"   %% "akka-http"             % "10.1.11",
+  "de.heikoseeberger"   %% "akka-http-circe"       % "1.30.0",
+  "ch.qos.logback"      % "logback-classic"        % "1.2.3",
+  "com.google.cloud"    % "google-cloud-firestore" % "1.32.0",
 )
 
 enablePlugins(JavaAppPackaging)
@@ -28,3 +28,7 @@ Docker / packageName := "gcr.io/untappd-263504/untappd-history"
 ThisBuild / dynverSeparator := "-"
 
 scalafmtOnCompile := true
+
+ThisBuild / scalafixDependencies ++= Seq(
+  "com.nequissimus" %% "sort-imports" % "0.3.1"
+)
