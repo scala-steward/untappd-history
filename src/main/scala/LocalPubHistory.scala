@@ -117,11 +117,11 @@ object LocalPubHistory {
     val hocon = hoconAt("untappd.history")
     loadConfig(
       hocon[String]("client-id").flatMapValue {
-        case path if path.contains("/") => file[String](new java.io.File(path)).value
+        case "" => Left(ConfigError("Please provide client id"))
         case id => Right(id)
       },
       hocon[Secret[String]]("client-secret").flatMapValue {
-        case Secret(path) if path.contains("/") => file[Secret[String]](new java.io.File(path)).value
+        case Secret("") => Left(ConfigError("Please provide client secret"))
         case secret => Right(secret)
       },
       hocon[String]("http.interface"),
