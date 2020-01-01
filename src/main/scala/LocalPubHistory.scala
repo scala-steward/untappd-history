@@ -2,8 +2,6 @@ package lt.dvim.untappd.history
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.Future
-import scala.concurrent.Promise
-import scala.jdk.CollectionConverters._
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -13,16 +11,21 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Attributes
+import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
+
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import ciris._
-import com.google.api.core.ApiFutureCallback
-import com.google.api.core.ApiFutures
 import com.google.cloud.firestore.Firestore
 import com.google.cloud.firestore.FirestoreOptions
-import com.google.cloud.firestore.WriteResult
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.Json
 import io.circe.optics.JsonPath._
 import io.circe.parser._
+
+import lt.dvim.untappd.history.Checkins._
+import lt.dvim.untappd.history.FirestoreOps._
+import lt.dvim.untappd.history.model.VilniusPub.DailyCheckins
 
 object LocalPubHistory {
 
@@ -42,10 +45,31 @@ object LocalPubHistory {
   }
 
   def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
-    path("checkins") {
-      get {
-        val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
-        complete(stored)
+    cors() {
+      path("checkins") {
+        get {
+          val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
+          complete(stored)
+        }
+      } ~ path("process-daily") {
+        get {
+          val result = gatherDailyCheckins()
+            .runWith(Sink.head)
+            .flatMap { daily =>
+              val ref = db.collection("daily").document("checkins")
+              ref.setAsync(daily.checkins.view.mapValues(_.toString).toMap)
+            }
+            .map(_ => "Done")
+          complete(result)
+        }
+      } ~ path("daily") {
+        val ref = db.document("daily/checkins").getAsync()
+        val daily = ref.map(data =>
+          DailyCheckins(data.view.mapValues {
+            case str: String => Integer.parseInt(str)
+          }.toMap)
+        )
+        complete(daily)
       }
     }
 
@@ -71,18 +95,9 @@ object LocalPubHistory {
       .map(json => (Optics.checkinId.getOption(json).get, json))
 
   def storeCheckin(checkinId: Int, data: Json)(implicit db: Firestore, ece: ExecutionContextExecutor): Future[Int] = {
-    val checkinRef = db.collection("checkins").document(checkinId.toString());
+    val checkinRef = db.collection("checkins").document(checkinId.toString())
     val attributes = Map("data" -> data.toString)
-    val promise = Promise[WriteResult]()
-    ApiFutures.addCallback(
-      checkinRef.set(attributes.asJava),
-      new ApiFutureCallback[WriteResult] {
-        def onFailure(t: Throwable) = promise.failure(t)
-        def onSuccess(result: WriteResult) = promise.success(result)
-      },
-      ece
-    )
-    promise.future.map(_ => checkinId)
+    checkinRef.setAsync(attributes).map(_ => checkinId)
   }
 
   private def untappdUri(config: Config): Uri = {
@@ -99,6 +114,7 @@ object LocalPubHistory {
   object Optics {
     val items = root.response.checkins.items.arr
     val checkinId = root.checkin_id.int
+    val createdAt = root.created_at.string
   }
 
   case class Location(lat: Double, lng: Double)
