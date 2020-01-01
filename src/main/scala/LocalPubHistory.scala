@@ -18,7 +18,6 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import ciris._
 import com.google.cloud.firestore.Firestore
 import com.google.cloud.firestore.FirestoreOptions
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.Json
 import io.circe.optics.JsonPath._
 import io.circe.parser._
@@ -46,6 +45,7 @@ object LocalPubHistory {
 
   def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
     cors() {
+      import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
       path("checkins") {
         get {
           val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
