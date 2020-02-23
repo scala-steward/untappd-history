@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.MissingQueryParamRejection
+import akka.http.scaladsl.server.InvalidRequiredValueForQueryParamRejection
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Attributes
 import akka.stream.scaladsl.Sink
@@ -47,7 +47,10 @@ object LocalPubHistory {
   private def internal =
     pathPrefix("internal").tflatMap { _ =>
       parameter("internal-token".as[String])
-        .trequire(_.equals(config.internalToken), MissingQueryParamRejection("internal-token"))
+        .require(
+          _ == config.internalToken,
+          InvalidRequiredValueForQueryParamRejection("internal-token", "<internal-token>", "")
+        )
     }
 
   private def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
