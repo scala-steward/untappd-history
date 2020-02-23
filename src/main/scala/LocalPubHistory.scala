@@ -9,6 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.MissingQueryParamRejection
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Attributes
 import akka.stream.scaladsl.Sink
@@ -43,26 +44,36 @@ object LocalPubHistory {
     ()
   }
 
-  def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
+  private def internal =
+    pathPrefix("internal").tflatMap { _ =>
+      parameter("internal-token".as[String])
+        .trequire(_.equals(config.internalToken), MissingQueryParamRejection("internal-token"))
+    }
+
+  private def routes()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
     cors() {
       import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-      path("checkins") {
-        get {
-          val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
-          complete(stored)
+      internal {
+        path("checkins") {
+          get {
+            val stored = storeCheckins().map(c => s"Successfully stored [$c] checkins")
+            complete(stored)
+          }
+        } ~
+        path("process-daily") {
+          get {
+            val result = gatherDailyCheckins()
+              .runWith(Sink.head)
+              .flatMap { daily =>
+                val ref = db.collection("daily").document("checkins")
+                ref.setAsync(daily.checkins.view.mapValues(_.toString).toMap)
+              }
+              .map(_ => "Done")
+            complete(result)
+          }
         }
-      } ~ path("process-daily") {
-        get {
-          val result = gatherDailyCheckins()
-            .runWith(Sink.head)
-            .flatMap { daily =>
-              val ref = db.collection("daily").document("checkins")
-              ref.setAsync(daily.checkins.view.mapValues(_.toString).toMap)
-            }
-            .map(_ => "Done")
-          complete(result)
-        }
-      } ~ path("daily") {
+      } ~
+      path("daily") {
         val ref = db.document("daily/checkins").getAsync()
         val daily = ref.map(data =>
           DailyCheckins(data.view.mapValues {
@@ -125,7 +136,8 @@ object LocalPubHistory {
       clientSecret: Secret[String],
       projectId: String,
       httpInterface: String,
-      httpPort: Int
+      httpPort: Int,
+      internalToken: String
   )
 
   import lt.dvim.ciris.Hocon._
@@ -141,15 +153,20 @@ object LocalPubHistory {
         case secret => Right(secret)
       },
       hocon[String]("http.interface"),
-      hocon[Int]("http.port")
-    ) { (clientId, clientSecret, interface, port) =>
+      hocon[Int]("http.port"),
+      hocon[String]("internal-token").flatMapValue {
+        case "" => Left(ConfigError("Please provide internal token"))
+        case token => Right(token)
+      }
+    ) { (clientId, clientSecret, interface, port, internalToken) =>
       Config(
         Location(54.688567, 25.275775), // Vilnius
         clientId,
         clientSecret,
         "untappd-263504",
         interface,
-        port
+        port,
+        internalToken
       )
     }.orThrow()
   }
