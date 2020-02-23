@@ -20,7 +20,7 @@ jobs:
           java-version: adopt@1.11
       - run: sbt scalafmtCheck
       - run: sbt scalafmtSbtCheck
-      - run: sbt scalafix --check
+      - run: sbt "scalafix --check"
       - name: yaml-lint
         uses: ibiqlik/action-yamllint@v0.0.2
         with:
