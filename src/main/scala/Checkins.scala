@@ -35,8 +35,6 @@ object Checkins {
       .map(_.getData().get("data").asInstanceOf[String])
       .map(body => parse(body).toTry.get.as[Checkin].toOption.get)
       .map(_.createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE))
-      .fold(Map.empty[String, Int]) { (acc, date) =>
-        acc.updatedWith(date)(count => Some(count.getOrElse(0) + 1))
-      }
+      .fold(Map.empty[String, Int])((acc, date) => acc.updatedWith(date)(count => Some(count.getOrElse(0) + 1)))
       .map(DailyCheckins.apply)
 }
