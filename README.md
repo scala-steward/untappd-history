@@ -9,3 +9,5 @@
 `untappd-history` processes [Untappd](https://untappd.com/home) checkins around [Vilnius](https://en.wikipedia.org/wiki/Vilnius).
 
 Currently the [only public endpoint](https://api.vilnius.pub/daily) returns a number of checkins for every day.
+
+The [vilnius.pub](vilnius.pub) ([source](https://github.com/2m/vilnius-pub)) website uses this code as the backend. 
