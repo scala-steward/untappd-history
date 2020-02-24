@@ -21,6 +21,7 @@ jobs:
       - run: sbt scalafmtCheck
       - run: sbt scalafmtSbtCheck
       - run: sbt "scalafix --check"
+      - run: sbt headerCheck
       - name: yaml-lint
         uses: ibiqlik/action-yamllint@v0.0.2
         with:
