@@ -19,7 +19,7 @@ libraryDependencies ++= Seq(
   "de.heikoseeberger"   %% "akka-http-circe"       % "1.31.0",
   "ch.megard"           %% "akka-http-cors"        % "0.4.2",
   "ch.qos.logback"      % "logback-classic"        % "1.2.3",
-  "com.google.cloud"    % "google-cloud-firestore" % "1.32.4"
+  "com.google.cloud"    % "google-cloud-firestore" % "1.32.5"
 )
 
 enablePlugins(JavaAppPackaging)
