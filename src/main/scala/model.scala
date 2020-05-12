@@ -40,16 +40,17 @@ object VilniusPub {
 
   implicit val encodeStats: Encoder[DailyCheckins] =
     new Encoder[DailyCheckins] {
-      final def apply(daily: DailyCheckins): Json = Json.arr(
-        daily.checkins.toSeq
-          .sortBy(_._1)
-          .map {
-            case (date, count) =>
-              Json.obj(
-                ("name", Json.fromString(date)),
-                ("checkins", Json.fromInt(count))
-              )
-          }: _*
-      )
+      final def apply(daily: DailyCheckins): Json =
+        Json.arr(
+          daily.checkins.toSeq
+            .sortBy(_._1)
+            .map {
+              case (date, count) =>
+                Json.obj(
+                  ("name", Json.fromString(date)),
+                  ("checkins", Json.fromInt(count))
+                )
+            }: _*
+        )
     }
 }
