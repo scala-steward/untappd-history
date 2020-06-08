@@ -4,7 +4,7 @@ description := "History and statistics of Untappd checkins"
 
 scalaVersion := "2.13.1"
 
-val Akka = "2.6.5"
+val Akka = "2.6.6"
 val Circe = "0.13.0"
 
 libraryDependencies ++= Seq(
