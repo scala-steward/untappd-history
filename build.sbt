@@ -31,7 +31,7 @@ ThisBuild / dynverSeparator := "-"
 scalafmtOnCompile := true
 
 ThisBuild / scalafixDependencies ++= Seq(
-  "com.nequissimus" %% "sort-imports" % "0.5.3"
+  "com.nequissimus" %% "sort-imports" % "0.5.4"
 )
 
 enablePlugins(AutomateHeaderPlugin)
