@@ -56,7 +56,7 @@ object LocalPubHistory {
     implicit val sys = ActorSystem("untappd")
     import sys.dispatcher
 
-    Http().bindAndHandle(routes(), config.httpInterface, config.httpPort)
+    Http().newServerAt(config.httpInterface, config.httpPort).bind(routes())
     ()
   }
 
