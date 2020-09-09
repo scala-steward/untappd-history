@@ -44,12 +44,11 @@ object VilniusPub {
         Json.arr(
           daily.checkins.toSeq
             .sortBy(_._1)
-            .map {
-              case (date, count) =>
-                Json.obj(
-                  ("name", Json.fromString(date)),
-                  ("checkins", Json.fromInt(count))
-                )
+            .map { case (date, count) =>
+              Json.obj(
+                ("name", Json.fromString(date)),
+                ("checkins", Json.fromInt(count))
+              )
             }: _*
         )
     }
