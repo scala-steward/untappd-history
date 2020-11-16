@@ -4,7 +4,7 @@ name: ci
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
-      - master
+    - master
   pull_request:
 
 jobs:
@@ -14,18 +14,16 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v1
-      - uses: olafurpg/setup-scala@v7
-        with:
-          java-version: adopt@1.11
-      - run: sbt scalafmtCheck
-      - run: sbt scalafmtSbtCheck
-      - run: sbt "scalafix --check"
-      - run: sbt headerCheck
-      - name: yaml-lint
-        uses: ibiqlik/action-yamllint@v0.0.2
-        with:
-          file_or_dir: .github/workflows/ci.yml gcloud/cloudbuild-master.yaml
+    - uses: actions/checkout@v1
+    - uses: olafurpg/setup-scala@v7
+      with:
+        java-version: adopt@1.11
+    - run: sbt scalafmtCheck
+    - run: sbt scalafmtSbtCheck
+    - run: sbt "scalafix --check"
+    - run: sbt headerCheck
+    - name: yaml-lint
+      uses: ibiqlik/action-yamllint@v3
 
   test:
     name: Compile and test
@@ -33,8 +31,8 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v1
-      - uses: olafurpg/setup-scala@v7
-        with:
-          java-version: adopt@1.11
-      - run: sbt test
+    - uses: actions/checkout@v1
+    - uses: olafurpg/setup-scala@v7
+      with:
+        java-version: adopt@1.11
+    - run: sbt test
