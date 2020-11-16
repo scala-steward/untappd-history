@@ -1,19 +1,19 @@
 ---
 
 steps:
-  - name: 'gcr.io/$PROJECT_ID/scala-sbt'
-    args: ['clean', 'Docker/publishLocal']
+- name: 'gcr.io/$PROJECT_ID/scala-sbt'
+  args: ['clean', 'Docker/publishLocal']
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/untappd-history']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/untappd-history']
 
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - beta
-      - run
-      - deploy
-      - untappd-history
-      - --image=gcr.io/$PROJECT_ID/untappd-history
-      - --region=europe-west1
-      - --platform=managed
-      - --allow-unauthenticated
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - beta
+  - run
+  - deploy
+  - untappd-history
+  - --image=gcr.io/$PROJECT_ID/untappd-history
+  - --region=europe-west1
+  - --platform=managed
+  - --allow-unauthenticated
