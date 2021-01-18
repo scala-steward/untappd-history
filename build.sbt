@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
   "io.circe"            %% "circe-generic"          % Circe,
   "com.typesafe.akka"   %% "akka-stream"            % Akka,
   "com.typesafe.akka"   %% "akka-slf4j"             % Akka,
-  "com.typesafe.akka"   %% "akka-http"              % "10.2.2",
+  "com.typesafe.akka"   %% "akka-http"              % "10.2.3",
   "de.heikoseeberger"   %% "akka-http-circe"        % "1.35.3",
   "ch.megard"           %% "akka-http-cors"         % "1.1.1",
   "ch.qos.logback"       % "logback-classic"        % "1.2.3",
