@@ -35,7 +35,7 @@ class DocumentReferenceOps(ref: DocumentReference) {
   def setAsync(attributes: Map[String, String])(implicit ex: Executor) =
     ref.set(attributes.asJava).toScala
   def getAsync()(implicit ex: ExecutionContextExecutor) =
-    ref.get().toScala.map(_.getData().asScala.toMap)
+    ref.get().toScala.map(_.getData().asScala.asInstanceOf[Map[String, String]])
 }
 
 class QueryOps(query: Query) {

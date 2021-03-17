@@ -94,11 +94,7 @@ object LocalPubHistory {
       } ~
       path("daily") {
         val ref = db.document("daily/checkins").getAsync()
-        val daily = ref.map(data =>
-          DailyCheckins(data.view.mapValues { case str: String =>
-            Integer.parseInt(str)
-          }.toMap)
-        )
+        val daily = ref.map(data => DailyCheckins(data.view.mapValues(Integer.parseInt).toMap))
         complete(daily)
       }
     }
