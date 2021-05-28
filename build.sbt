@@ -10,7 +10,7 @@ val Circe = "0.14.1"
 libraryDependencies ++= Seq(
   "is.cir"              %% "ciris-core"             % "0.13.0-RC1",
   "lt.dvim.ciris-hocon" %% "ciris-hocon"            % "0.2.1",
-  "io.circe"            %% "circe-optics"           % "0.13.0",
+  "io.circe"            %% "circe-optics"           % "0.14.1",
   "io.circe"            %% "circe-parser"           % Circe,
   "io.circe"            %% "circe-generic"          % Circe,
   "com.typesafe.akka"   %% "akka-stream"            % Akka,
