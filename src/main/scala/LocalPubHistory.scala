@@ -79,24 +79,24 @@ object LocalPubHistory {
             complete(stored)
           }
         } ~
-        path("process-daily") {
-          get {
-            val result = gatherDailyCheckins()
-              .runWith(Sink.head)
-              .flatMap { daily =>
-                val ref = db.collection("daily").document("checkins")
-                ref.setAsync(daily.checkins.view.mapValues(_.toString).toMap)
-              }
-              .map(_ => "Done")
-            complete(result)
+          path("process-daily") {
+            get {
+              val result = gatherDailyCheckins()
+                .runWith(Sink.head)
+                .flatMap { daily =>
+                  val ref = db.collection("daily").document("checkins")
+                  ref.setAsync(daily.checkins.view.mapValues(_.toString).toMap)
+                }
+                .map(_ => "Done")
+              complete(result)
+            }
           }
-        }
       } ~
-      path("daily") {
-        val ref = db.document("daily/checkins").getAsync()
-        val daily = ref.map(data => DailyCheckins(data.view.mapValues(Integer.parseInt).toMap))
-        complete(daily)
-      }
+        path("daily") {
+          val ref = db.document("daily/checkins").getAsync()
+          val daily = ref.map(data => DailyCheckins(data.view.mapValues(Integer.parseInt).toMap))
+          complete(daily)
+        }
     }
 
   def storeCheckins()(implicit sys: ActorSystem, db: Firestore, ece: ExecutionContextExecutor) =
@@ -165,12 +165,12 @@ object LocalPubHistory {
       },
       hocon[Secret[String]]("client-secret").flatMapValue {
         case Secret("") => Left(ConfigError("Please provide client secret"))
-        case secret => Right(secret)
+        case secret     => Right(secret)
       },
       hocon[String]("http.interface"),
       hocon[Int]("http.port"),
       hocon[String]("internal-token").flatMapValue {
-        case "" => Left(ConfigError("Please provide internal token"))
+        case ""    => Left(ConfigError("Please provide internal token"))
         case token => Right(token)
       }
     ) { (clientId, clientSecret, interface, port, internalToken) =>
