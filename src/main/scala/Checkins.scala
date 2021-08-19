@@ -40,7 +40,7 @@ object Checkins {
         val data = startAfter.fold(query)(query.startAfter).getAsync()
         data.map {
           case elements if elements.isEmpty => None
-          case elements => Some((Some(elements.last), elements))
+          case elements                     => Some((Some(elements.last), elements))
         }
       }
       .mapConcat(identity)
