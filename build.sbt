@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"   %% "akka-http"              % "10.2.6",
   "de.heikoseeberger"   %% "akka-http-circe"        % "1.37.0",
   "ch.megard"           %% "akka-http-cors"         % "1.1.2",
-  "ch.qos.logback"       % "logback-classic"        % "1.2.5",
+  "ch.qos.logback"       % "logback-classic"        % "1.2.6",
   "com.google.cloud"     % "google-cloud-firestore" % "3.0.3"
 )
 
