@@ -2,7 +2,7 @@ organization := "lt.dvim.untappd"
 name := "untappd-history"
 description := "History and statistics of Untappd checkins"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.10"
 
 val Akka = "2.6.20"
 val Circe = "0.14.3"
@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"   %% "akka-http"              % "10.2.10",
   "de.heikoseeberger"   %% "akka-http-circe"        % "1.39.2",
   "ch.megard"           %% "akka-http-cors"         % "1.1.3",
-  "ch.qos.logback"       % "logback-classic"        % "1.4.1",
+  "ch.qos.logback"       % "logback-classic"        % "1.4.4",
   "com.google.cloud"     % "google-cloud-firestore" % "3.5.0"
 )
 
