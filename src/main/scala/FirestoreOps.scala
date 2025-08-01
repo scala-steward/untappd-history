@@ -27,8 +27,8 @@ import com.google.cloud.firestore.Query
 import lt.dvim.untappd.history.ApiFutureOps._
 
 object FirestoreOps {
-  implicit def documentReferenceOps(ref: DocumentReference) = new DocumentReferenceOps(ref)
-  implicit def queryOps(query: Query) = new QueryOps(query)
+  implicit def documentReferenceOps(ref: DocumentReference): DocumentReferenceOps = new DocumentReferenceOps(ref)
+  implicit def queryOps(query: Query): QueryOps = new QueryOps(query)
 }
 
 class DocumentReferenceOps(ref: DocumentReference) {

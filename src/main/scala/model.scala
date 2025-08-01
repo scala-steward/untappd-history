@@ -27,7 +27,7 @@ object Untappd {
 
   final val Vilnius = ZoneId.of("Europe/Vilnius")
 
-  implicit val decodeRfc1123ZonedDateTime =
+  implicit val decodeRfc1123ZonedDateTime: Decoder[ZonedDateTime] =
     Decoder
       .decodeZonedDateTimeWithFormatter(DateTimeFormatter.RFC_1123_DATE_TIME)
       .map(_.withZoneSameInstant(Vilnius))
