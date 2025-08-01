@@ -26,7 +26,7 @@ import com.google.api.core.ApiFutureCallback
 import com.google.api.core.ApiFutures
 
 object ApiFutureOps {
-  implicit def apiFutureOps[T](future: ApiFuture[T]) = new ApiFutureOps(future)
+  implicit def apiFutureOps[T](future: ApiFuture[T]): ApiFutureOps[T] = new ApiFutureOps(future)
 }
 
 class ApiFutureOps[T](future: ApiFuture[T]) {
